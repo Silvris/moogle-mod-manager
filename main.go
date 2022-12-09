@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
@@ -12,7 +14,7 @@ import (
 	config_installer "github.com/kiamev/moogle-mod-manager/ui/config-installer"
 	"github.com/kiamev/moogle-mod-manager/ui/configure"
 	"github.com/kiamev/moogle-mod-manager/ui/discover"
-	"github.com/kiamev/moogle-mod-manager/ui/game-select"
+	game_select "github.com/kiamev/moogle-mod-manager/ui/game-select"
 	"github.com/kiamev/moogle-mod-manager/ui/local"
 	"github.com/kiamev/moogle-mod-manager/ui/menu"
 	mod_author "github.com/kiamev/moogle-mod-manager/ui/mod-author"
@@ -31,6 +33,7 @@ func main() {
 
 	state.App = app.New()
 	state.Window = state.App.NewWindow("Moogle Mod Manager " + browser.Version)
+	os.Setenv("FYNE_SCALE", "0.2")
 	initialize()
 
 	// Mod versions

@@ -1,6 +1,7 @@
 package config
 
 import (
+<<<<<<< Updated upstream
 	"errors"
 	"fyne.io/fyne/v2"
 	"github.com/kiamev/moogle-mod-manager/util"
@@ -8,8 +9,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+=======
+	"os"
+	"path/filepath"
+>>>>>>> Stashed changes
 
-	"golang.org/x/sys/windows/registry"
+	"fyne.io/fyne/v2"
+	"github.com/kiamev/moogle-mod-manager/util"
 )
 
 const configsFile = "configs.json"
@@ -206,6 +212,7 @@ func (c *Configs) Initialize() (err error) {
 	}
 	if err = util.LoadFromFile(filepath.Join(PWD, configsFile), c); err != nil {
 		c.FirstTime = true
+<<<<<<< Updated upstream
 		c.Theme = DarkThemeColor
 	}
 	c.setDefaults()
@@ -227,26 +234,20 @@ func (c *Configs) Initialize() (err error) {
 	}
 	if c.DirVI == "" {
 		c.DirVI = c.getGameDirFromRegistry(idVI)
+=======
+		c.DirI = c.getGameDirFromDisk(idI)
+		c.DirII = c.getGameDirFromDisk(idII)
+		c.DirIII = c.getGameDirFromDisk(idIII)
+		c.DirIV = c.getGameDirFromDisk(idIV)
+		c.DirV = c.getGameDirFromDisk(idV)
+		c.DirVI = c.getGameDirFromDisk(idVI)
+		c.Theme = DarkThemeColor
+>>>>>>> Stashed changes
 	}
 	if c.DirChrCrs == "" {
 		c.DirChrCrs = c.getGameDirFromRegistry(idChronoCross)
 	}
 	return nil
-}
-
-func (c *Configs) getGameDirFromRegistry(gameId string) (dir string) {
-	//only poke into registry for Windows, there's probably a similar method for Mac/Linux
-	if runtime.GOOS == "windows" {
-		key, err := registry.OpenKey(registry.LOCAL_MACHINE, windowsRegLookup+gameId, registry.QUERY_VALUE)
-		if err != nil {
-			return
-		}
-		if dir, _, err = key.GetStringValue("InstallLocation"); err != nil {
-			dir = ""
-		}
-	}
-	return
-
 }
 
 func (c *Configs) Save() (err error) {
