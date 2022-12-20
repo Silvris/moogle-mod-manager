@@ -11,3 +11,6 @@ temp
 */moogle-mod-manager.upx
 !example/*
 !winres/*
+upx.exe
+moogle-mod-manager.exe
+moogle-mod-manager-linux.x86_64

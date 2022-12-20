@@ -21,11 +21,8 @@ require (
 
 require (
 	fyne.io/systray v1.10.1-0.20220621085403-9a2652634e93 // indirect
-<<<<<<< Updated upstream
-=======
 	fyne.io/x/fyne v0.0.0-20220811211558-27fab34c671c // indirect
 	github.com/BurntSushi/toml v1.1.0 // indirect
->>>>>>> Stashed changes
 	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect

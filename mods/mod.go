@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -14,18 +15,9 @@ import (
 	"github.com/kiamev/moogle-mod-manager/mods/managed/cache"
 	"github.com/kiamev/moogle-mod-manager/ui/state"
 	"github.com/kiamev/moogle-mod-manager/util"
-<<<<<<< Updated upstream
-	"net/url"
-	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
-=======
->>>>>>> Stashed changes
 )
 
-type (
+type(
 	SelectType string
 	Category   string
 	ModID      string

@@ -1,21 +1,12 @@
 package config
 
 import (
-<<<<<<< Updated upstream
 	"errors"
 	"fyne.io/fyne/v2"
 	"github.com/kiamev/moogle-mod-manager/util"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-=======
-	"os"
-	"path/filepath"
->>>>>>> Stashed changes
-
-	"fyne.io/fyne/v2"
-	"github.com/kiamev/moogle-mod-manager/util"
 )
 
 const configsFile = "configs.json"
@@ -212,40 +203,30 @@ func (c *Configs) Initialize() (err error) {
 	}
 	if err = util.LoadFromFile(filepath.Join(PWD, configsFile), c); err != nil {
 		c.FirstTime = true
-<<<<<<< Updated upstream
 		c.Theme = DarkThemeColor
 	}
 	c.setDefaults()
 
 	if c.DirI == "" {
-		c.DirI = c.getGameDirFromRegistry(idI)
+		c.DirI = c.getGameDirFromDisk(idI)
 	}
 	if c.DirII == "" {
-		c.DirII = c.getGameDirFromRegistry(idII)
+		c.DirII = c.getGameDirFromDisk(idII)
 	}
 	if c.DirIII == "" {
-		c.DirIII = c.getGameDirFromRegistry(idIII)
+		c.DirIII = c.getGameDirFromDisk(idIII)
 	}
 	if c.DirIV == "" {
-		c.DirIV = c.getGameDirFromRegistry(idIV)
+		c.DirIV = c.getGameDirFromDisk(idIV)
 	}
 	if c.DirV == "" {
-		c.DirV = c.getGameDirFromRegistry(idV)
+		c.DirV = c.getGameDirFromDisk(idV)
 	}
 	if c.DirVI == "" {
-		c.DirVI = c.getGameDirFromRegistry(idVI)
-=======
-		c.DirI = c.getGameDirFromDisk(idI)
-		c.DirII = c.getGameDirFromDisk(idII)
-		c.DirIII = c.getGameDirFromDisk(idIII)
-		c.DirIV = c.getGameDirFromDisk(idIV)
-		c.DirV = c.getGameDirFromDisk(idV)
 		c.DirVI = c.getGameDirFromDisk(idVI)
-		c.Theme = DarkThemeColor
->>>>>>> Stashed changes
 	}
 	if c.DirChrCrs == "" {
-		c.DirChrCrs = c.getGameDirFromRegistry(idChronoCross)
+		c.DirChrCrs = c.getGameDirFromDisk(idChronoCross)
 	}
 	return nil
 }
