@@ -1,150 +1,79 @@
 package mod_author
 
 import (
-	"fmt"
-	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/kiamev/moogle-mod-manager/mods"
-	cw "github.com/kiamev/moogle-mod-manager/ui/custom-widgets"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
-	"path/filepath"
-	"strings"
 )
 
-type downloadsDef struct {
-	*entryManager
-	list *cw.DynamicList
-	kind *mods.Kind
-}
-
-func newDownloadsDef(kind *mods.Kind) *downloadsDef {
-	d := &downloadsDef{
-		entryManager: newEntryManager(),
-		kind:         kind,
+type (
+	Compileable interface {
+		CompileDownloads() ([]mods.Download, error)
 	}
-	d.list = cw.NewDynamicList(cw.Callbacks{
-		GetItemKey:    d.getItemKey,
-		GetItemFields: d.getItemFields,
-		OnEditItem:    d.onEditItem,
-	}, true)
+	downloads struct {
+		*container.TabItem
+		subKind *widget.Select
+		dld     *downloadsDef
+		ghd     *githubDownloadsDef
+	}
+)
+
+func newDownloads(kind *mods.Kind, s *widget.Select) *downloads {
+	d := &downloads{
+		subKind: s,
+		dld:     newDownloadsDef(kind),
+		ghd:     newGithubDownloadsDef(),
+	}
+	d.UpdateTab()
 	return d
 }
 
-func (d *downloadsDef) compile() []*mods.Download {
-	downloads := make([]*mods.Download, len(d.list.Items))
-	for i, item := range d.list.Items {
-		downloads[i] = item.(*mods.Download)
+func (d *downloads) compileDownloads() (result []*mods.Download, err error) {
+	if d.isGithub() {
+		_, _, result, err = d.ghd.compile()
+	} else {
+		result = d.dld.compile()
 	}
-	return downloads
+	return
 }
 
-func (d *downloadsDef) getItemKey(item interface{}) string {
-	dl := item.(*mods.Download)
-	if dl.Version == "" {
-		return dl.Name
+func (d *downloads) compile(mod *mods.Mod) (err error) {
+	if d.isGithub() {
+		mod.Version, mod.ModKind.GitHub, mod.Downloadables, err = d.ghd.compile()
+	} else {
+		mod.Downloadables = d.dld.compile()
 	}
-	return fmt.Sprintf("%s - %s", dl.Name, dl.Version)
+	return
 }
 
-func (d *downloadsDef) getItemFields(item interface{}) []string {
-	return []string{
-		item.(*mods.Download).Name,
-		//strings.Join(item.(*mods.Download).Sources, ", "),
-		//string(item.(*mods.Download).InstallType),
+func (d *downloads) set(mod *mods.Mod) {
+	d.ghd.set(mod.ModKind.GitHub)
+	d.dld.set(mod.Downloadables)
+}
+
+func (d *downloads) clear() {
+	if d.isGithub() {
+		d.ghd.clear()
 	}
 }
 
-func (d *downloadsDef) onEditItem(item interface{}) {
-	d.createItem(item)
+func (d *downloads) isGithub() bool {
+	return d.subKind.Selected == string(mods.HostedGitHub)
 }
 
-func (d *downloadsDef) createItem(item interface{}, done ...func(interface{})) {
-	m := item.(*mods.Download)
-	d.createFormItem("Name", m.Name)
-	d.createFormItem("Version", m.Version)
-	d.createFormItem("File Name", "")
-	d.createFormItem("File ID", "")
-	//d.createFormSelect("Install Type", mods.InstallTypes, string(m.InstallType))
-	if *d.kind == mods.Nexus {
-		if m.Nexus != nil {
-			var fileName, fileID string
-			if m.Nexus != nil {
-				fileName = m.Nexus.FileName
-				fileID = fmt.Sprintf("%d", m.Nexus.FileID)
-			}
-			d.createFormItem("File Name", fileName)
-			d.createFormItem("File ID", fileID)
-		}
+func (d *downloads) UpdateTab() {
+	if d.TabItem == nil {
+		d.TabItem = container.NewTabItem("", container.NewCenter())
 	}
-	if *d.kind == mods.Hosted {
-		var sources []string
-		if m.Hosted != nil {
-			sources = m.Hosted.Sources
-		}
-		d.createFormMultiLine("Sources", strings.Join(sources, "\n"))
-	}
-
-	items := []*widget.FormItem{
-		d.getFormItem("Name"),
-		d.getFormItem("Version"),
-	}
-	if *d.kind == mods.Nexus {
-		items = append(items, d.getFormItem("File Name"))
-		items = append(items, d.getFormItem("File ID"))
-	}
-	if *d.kind == mods.Hosted {
-		items = append(items, d.getFormItem("Sources"))
-	}
-
-	fd := dialog.NewForm("Edit Downloadable", "Save", "Cancel", items, func(ok bool) {
-		if ok {
-			m.Version = d.getString("Version")
-			if *d.kind == mods.Nexus {
-				if m.Nexus == nil {
-					m.Nexus = &mods.NexusDownloadable{}
-				}
-				m.Nexus.FileName = d.getString("File Name")
-				m.Nexus.FileID = d.getInt("File ID")
-				m.Name = filepath.Base(m.Nexus.FileName)
-			} else if *d.kind == mods.Hosted {
-				if m.Hosted == nil {
-					m.Hosted = &mods.HostedDownloadable{}
-				}
-				m.Hosted.Sources = d.getStrings("Sources", "\n")
-				if len(m.Hosted.Sources) > 0 {
-					m.Name = filepath.Base(m.Hosted.Sources[0])
-				}
-			}
-			if m.Name != "" {
-				m.Name = strings.TrimSuffix(m.Name, filepath.Ext(m.Name))
-			}
-			//m.InstallType = mods.InstallType(d.getString("Install Type"))
-			if len(done) > 0 {
-				done[0](m)
-			}
-			d.list.Refresh()
-		}
-	}, state.Window)
-	fd.Resize(fyne.NewSize(600, 400))
-	fd.Show()
-}
-
-func (d *downloadsDef) draw() fyne.CanvasObject {
-	return container.NewVBox(container.NewHBox(
-		widget.NewLabelWithStyle("Downloadables", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		widget.NewButton("Add", func() {
-			d.createItem(&mods.Download{}, func(result interface{}) {
-				d.list.AddItem(result)
-			})
-		})),
-		d.list.Draw())
-}
-
-func (d *downloadsDef) set(downloadables []*mods.Download) {
-	d.list.Clear()
-	for _, i := range downloadables {
-		d.list.AddItem(i)
+	switch mods.SubKind(d.subKind.Selected) {
+	case mods.HostedAt:
+		d.TabItem.Text = "Downloads"
+		d.TabItem.Content = d.dld.draw()
+	case mods.HostedGitHub:
+		d.TabItem.Text = "GitHub"
+		d.TabItem.Content = d.ghd.draw()
+	default:
+		d.TabItem.Text = "-"
+		d.TabItem.Content = widget.NewLabel("Select a 'Kind'")
 	}
 }

@@ -7,23 +7,24 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/kiamev/moogle-mod-manager/mods"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-type DownloadCompleteCallback func(enabler *mods.ModEnabler, err error)
+type hostedConfirmer struct {
+	Params
+}
 
-type downloadCallback func(enabler *mods.ModEnabler, completeCallback DownloadCompleteCallback, err error)
+func newHostedConfirmer(params Params) Confirmer {
+	return &hostedConfirmer{Params: params}
+}
 
-func Hosted(enabler *mods.ModEnabler, completeCallback DownloadCompleteCallback, done downloadCallback) {
-	var (
-		sb  = strings.Builder{}
-		err error
-	)
-	for i, ti := range enabler.ToInstall {
-		if alreadyDownloaded(enabler, ti) {
+func (c *hostedConfirmer) Downloads(done func(mods.Result)) (err error) {
+	var sb = strings.Builder{}
+	for i, ti := range c.ToInstall {
+		if c.alreadyDownloaded(ti) {
 			continue
 		}
 		sb.WriteString(fmt.Sprintf("## Download %d\n\n", i+1))
@@ -37,23 +38,26 @@ func Hosted(enabler *mods.ModEnabler, completeCallback DownloadCompleteCallback,
 		}
 	}
 	if sb.Len() == 0 {
-		done(enabler, completeCallback, err)
+		done(mods.Ok)
 		return
 	}
 
 	d := dialog.NewCustomConfirm("Download Files?", "Yes", "Cancel", container.NewVScroll(widget.NewRichTextFromMarkdown(sb.String())), func(ok bool) {
-		if ok {
-			done(enabler, completeCallback, err)
+		result := mods.Ok
+		if !ok {
+			result = mods.Cancel
 		}
-	}, state.Window)
+		done(result)
+	}, ui.Window)
 	d.Resize(fyne.NewSize(500, 400))
 	d.Show()
+	return
 }
 
-func alreadyDownloaded(enabler *mods.ModEnabler, ti *mods.ToInstall) bool {
+func (c *hostedConfirmer) alreadyDownloaded(ti *mods.ToInstall) bool {
 	file := strings.Split(ti.Download.Hosted.Sources[0], "/")
 	file = strings.Split(file[len(file)-1], "?")
-	dir, _ := ti.GetDownloadLocation(enabler.Game, enabler.TrackedMod)
+	dir, _ := ti.GetDownloadLocation(c.Game, c.Mod)
 	_, err := os.Stat(filepath.Join(dir, file[0]))
 	return err == nil
 }

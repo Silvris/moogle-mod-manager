@@ -41,44 +41,48 @@ func NewToInstallForMod(kind Kind, mod *Mod, downloadFiles []*DownloadFiles) (re
 		i.Dirs = append(i.Dirs, df.Dirs...)
 	}
 	for n, df := range dfLookup {
-		dl, _ := mLookup[n]
+		dl := mLookup[n]
 		result = append(result, NewToInstall(kind, dl, df))
 	}
 	return
 }
 
-func (ti *ToInstall) GetDownloadLocation(game config.Game, tm *TrackedMod) (string, error) {
-	if ti.kind == Hosted {
-		return ti.getHostedDownloadLocation(game, tm)
+func (ti *ToInstall) GetDownloadLocation(game config.GameDef, tm TrackedMod) (string, error) {
+	switch ti.kind {
+	case Hosted:
+		switch tm.SubKind() {
+		case HostedGitHub:
+			return ti.getHostedDownloadLocation(game, tm, tm.Mod().Version)
+		default:
+			return ti.getHostedDownloadLocation(game, tm, ti.Download.Version)
+		}
+	case Nexus, CurseForge:
+		return ti.getRemoteDownloadLocation(game, tm)
 	}
-	return ti.getNexusDownloadLocation(game, tm)
+	panic(fmt.Sprintf("unknown kind %v", ti.kind))
 }
 
-func (ti *ToInstall) getHostedDownloadLocation(game config.Game, tm *TrackedMod) (string, error) {
-	if ti.downloadDir == "" {
-		v := ti.Download.Version
-		if v == "" {
-			v = "nv"
-		}
-		if len(tm.Mod.Games) > 0 && tm.Mod.Category == Utility {
-			ti.downloadDir = config.Get().GetDownloadFullPathForUtility()
-		} else {
-			ti.downloadDir = config.Get().GetDownloadFullPathForGame(game)
-		}
-		ti.downloadDir = filepath.Join(ti.downloadDir, tm.GetDirSuffix(), util.CreateFileName(v))
-		if err := createPath(ti.downloadDir); err != nil {
-			return "", err
-		}
+func (ti *ToInstall) getHostedDownloadLocation(game config.GameDef, tm TrackedMod, v string) (string, error) {
+	var m = tm.Mod()
+	if v == "" {
+		v = "nv"
+	}
+	if len(m.Games) > 0 && m.Category == Utility {
+		ti.downloadDir = config.Get().GetDownloadFullPathForUtility()
+	} else {
+		ti.downloadDir = config.Get().GetDownloadFullPathForGame(game)
+	}
+	ti.downloadDir = filepath.Join(ti.downloadDir, tm.ID().AsDir(), util.CreateFileName(v))
+	if err := createPath(ti.downloadDir); err != nil {
+		return "", err
 	}
 	return ti.downloadDir, nil
 }
 
-func (ti *ToInstall) getNexusDownloadLocation(game config.Game, tm *TrackedMod) (string, error) {
-	if ti.downloadDir == "" {
-		ti.downloadDir = filepath.Join(config.Get().GetDownloadFullPathForGame(game), tm.GetDirSuffix(), util.CreateFileName(ti.Download.Version))
-		if err := createPath(ti.downloadDir); err != nil {
-			return "", err
-		}
+func (ti *ToInstall) getRemoteDownloadLocation(game config.GameDef, tm TrackedMod) (string, error) {
+	ti.downloadDir = filepath.Join(config.Get().GetDownloadFullPathForGame(game), tm.ID().AsDir(), util.CreateFileName(ti.Download.Version))
+	if err := createPath(ti.downloadDir); err != nil {
+		return "", err
 	}
 	return ti.downloadDir, nil
 }

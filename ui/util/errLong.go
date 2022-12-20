@@ -5,22 +5,22 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
-	"golang.design/x/clipboard"
+	"github.com/atotto/clipboard"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 )
 
-func ShowErrorLong(err error, w ...fyne.Window) {
+func ShowErrorLong(err error) {
 	var (
-		window = state.Window
+		window = ui.Window
 		text   = widget.NewRichTextWithText(err.Error())
 	)
-	if len(w) > 0 && w[0] != nil {
-		window = w[0]
+	if ui.ShowingPopup {
+		window = ui.PopupWindow
 	}
 	text.Wrapping = fyne.TextWrapBreak
 
 	button := widget.NewButton("Copy To Clipboard", func() {
-		clipboard.Write(clipboard.FmtText, []byte(err.Error()))
+		_ = clipboard.WriteAll(err.Error())
 	})
 
 	errDialog := dialog.NewCustom("Error", "OK", container.NewBorder(button, nil, nil, nil, container.NewVScroll(text)), window)

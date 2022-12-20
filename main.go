@@ -9,6 +9,7 @@ import (
 	"github.com/kiamev/moogle-mod-manager/browser"
 	"github.com/kiamev/moogle-mod-manager/config"
 	"github.com/kiamev/moogle-mod-manager/discover/repo"
+	"github.com/kiamev/moogle-mod-manager/files"
 	"github.com/kiamev/moogle-mod-manager/mods/managed"
 	"github.com/kiamev/moogle-mod-manager/mods/managed/authored"
 	config_installer "github.com/kiamev/moogle-mod-manager/ui/config-installer"
@@ -19,21 +20,33 @@ import (
 	"github.com/kiamev/moogle-mod-manager/ui/menu"
 	mod_author "github.com/kiamev/moogle-mod-manager/ui/mod-author"
 	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 	"github.com/kiamev/moogle-mod-manager/ui/util"
 	"github.com/kiamev/moogle-mod-manager/ui/util/resources"
-	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime/pprof"
 )
 
 func main() {
 	defer func() {
 		if err := recover(); err != nil {
-			_ = ioutil.WriteFile("log.txt", []byte(err.(string)), 0644)
+			_ = os.WriteFile("log.txt", []byte(err.(string)), 0644)
 		}
 	}()
 
-	state.App = app.New()
-	state.Window = state.App.NewWindow("Moogle Mod Manager " + browser.Version)
+	if os.Getenv("profile") == "true" {
+		f, err := os.Create(filepath.Join(config.PWD, "cpuprofile"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		_ = pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	os.Setenv("FYNE_SCALE", "0.2")
+	ui.App = app.New()
+	ui.Window = ui.App.NewWindow("Moogle Mod Manager " + browser.Version)
 	initialize()
 
 	// Mod versions
@@ -97,24 +110,19 @@ func main() {
 
 	state.ShowScreen(state.None)
 	if config.Get().FirstTime {
-		configure.Show(state.Window)
+		configure.Show(ui.Window)
 	}
 
-	if state.SetCurrentGameFromString(config.Get().DefaultGame) {
+	if game, err := config.GameDefFromID(config.GameID(config.Get().DefaultGame)); err == nil {
+		state.CurrentGame = game
 		state.ShowScreen(state.LocalMods)
 	}
 
-	state.Window.ShowAndRun()
+	ui.Window.ShowAndRun()
 }
 
 func initialize() {
 	var err error
-	if err = managed.Initialize(); err != nil {
-		util.ShowErrorLong(err)
-	}
-	if err = authored.Initialize(); err != nil {
-		util.ShowErrorLong(err)
-	}
 	config.GetSecrets().Initialize()
 
 	if err = repo.Initialize(); err != nil {
@@ -126,15 +134,35 @@ func initialize() {
 		util.ShowErrorLong(err)
 	}
 
-	state.Window.Resize(config.Get().Size())
+	ui.Window.Resize(config.Get().Size())
+	ui.Window.SetMaster()
 
 	if configs.Theme == config.LightThemeColor {
 		fyne.CurrentApp().Settings().SetTheme(theme.LightTheme())
 	}
 
-	resources.Initialize()
+	if err = repo.NewGetter(repo.Read).Pull(); err != nil {
+		util.ShowErrorLong(err)
+	}
 
+	if err = config.Initialize(repo.Dirs(repo.Read)); err != nil {
+		util.ShowErrorLong(err)
+	}
+
+	if err = files.Initialize(); err != nil {
+		util.ShowErrorLong(err)
+	}
+
+	if err = managed.Initialize(config.GameDefs()); err != nil {
+		util.ShowErrorLong(err)
+	}
+	if err = authored.Initialize(); err != nil {
+		util.ShowErrorLong(err)
+	}
+
+	configs.InitializeGames(config.GameDefs())
+	resources.Initialize(config.GameDefs())
 	if resources.Icon != nil {
-		state.Window.SetIcon(resources.Icon)
+		ui.Window.SetIcon(resources.Icon)
 	}
 }

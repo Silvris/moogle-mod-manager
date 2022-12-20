@@ -5,6 +5,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"github.com/kiamev/moogle-mod-manager/config"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 )
 
 type GUI byte
@@ -18,11 +19,7 @@ const (
 )
 
 var (
-	CurrentGame *config.Game
-	App         fyne.App
-	Window      fyne.Window
-	popupWindow fyne.Window
-
+	CurrentGame  config.GameDef
 	guiHistories []*guiHistory
 	mainMenu     Screen
 	screens      = make(map[GUI]Screen)
@@ -62,31 +59,33 @@ func GetScreen(gui GUI) Screen {
 
 func ShowScreen(gui GUI, args ...interface{}) {
 	if gui == DiscoverMods {
-		if popupWindow == nil {
-			popupWindow = App.NewWindow("Finder")
-			popupWindow.Resize(config.Get().Size())
-			popupWindow.SetOnClosed(func() { popupWindow = nil })
-			popupWindow.Show()
-			if err := screens[gui].PreDraw(popupWindow, args); err != nil {
-				dialog.ShowError(err, Window)
+		if ui.PopupWindow == nil {
+			ui.PopupWindow = ui.App.NewWindow("Finder")
+			ui.PopupWindow.Resize(config.Get().Size())
+			ui.PopupWindow.SetOnClosed(func() { ui.PopupWindow = nil })
+			if err := screens[gui].PreDraw(ui.PopupWindow, args); err != nil {
+				dialog.ShowError(err, ui.Window)
 				return
 			}
-			screens[gui].DrawAsDialog(popupWindow)
+			ui.PopupWindow.Show()
+			ui.ShowingPopup = true
+			screens[gui].DrawAsDialog(ui.PopupWindow)
 		}
 		return
 	} else {
-		if err := screens[gui].PreDraw(Window, args); err != nil {
-			dialog.ShowError(err, Window)
+		if err := screens[gui].PreDraw(ui.Window, args); err != nil {
+			dialog.ShowError(err, ui.Window)
 			return
 		}
 	}
 	appendGuiHistory(gui)
-	mainMenu.Draw(Window)
-	screens[gui].Draw(Window)
+	mainMenu.Draw(ui.Window)
+	screens[gui].Draw(ui.Window)
 }
 
 func ClosePopupWindow() {
-	popupWindow.Close()
+	ui.PopupWindow.Close()
+	ui.ShowingPopup = false
 }
 
 func ShowPreviousScreen() {
@@ -100,14 +99,14 @@ func ShowPreviousScreen() {
 		s = screens[None]
 		SetBaseDir("")
 	}
-	Window.MainMenu().Refresh()
-	mainMenu.Draw(Window)
-	s.Draw(Window)
+	ui.Window.MainMenu().Refresh()
+	mainMenu.Draw(ui.Window)
+	s.Draw(ui.Window)
 }
 
 func UpdateCurrentScreen() {
 	s := screens[GetCurrentGUI()]
-	s.Draw(Window)
+	s.Draw(ui.Window)
 }
 
 func RegisterScreen(gui GUI, screen Screen) {
@@ -119,7 +118,7 @@ func RegisterMainMenu(m Screen) {
 }
 
 func RefreshMenu() {
-	Window.MainMenu().Refresh()
+	ui.Window.MainMenu().Refresh()
 }
 
 func GetBaseDir() string {
@@ -133,33 +132,4 @@ func GetBaseDirBinding() binding.String {
 
 func SetBaseDir(dir string) {
 	_ = baseDir.Set(dir)
-}
-
-func SetCurrentGameFromString(s string) bool {
-	var g config.Game
-	switch s {
-	case "I":
-		g = config.I
-	case "II":
-		g = config.II
-	case "III":
-		g = config.III
-	case "IV":
-		g = config.IV
-	case "V":
-		g = config.V
-	case "VI":
-		g = config.VI
-	case "Chrono Cross":
-		g = config.ChronoCross
-	// TODO BoF
-	//case "BoF III":
-	//	g = config.BofIII
-	//case "BoF IV":
-	//	g = config.BofIV
-	default:
-		return false
-	}
-	CurrentGame = &g
-	return true
 }

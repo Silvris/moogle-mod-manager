@@ -11,6 +11,7 @@ const (
 	Ok
 	Cancel
 	Error
+	Working
 )
 
 type (
@@ -31,15 +32,19 @@ func (c *FileConflict) OnChange(selected string) {
 }
 
 type ModEnabler struct {
-	Game         config.Game
-	TrackedMod   *TrackedMod
+	Game         config.GameDef
+	TrackedMod   TrackedMod
 	ToInstall    []*ToInstall
 	OnConflict   OnConflict
 	ShowWorking  func()
 	DoneCallback DoneCallback
 }
 
-func NewModEnabler(game config.Game, tm *TrackedMod, toInstall []*ToInstall, onConflict OnConflict, showWorking func(), doneCallback DoneCallback) *ModEnabler {
+func (e *ModEnabler) Kind() Kind {
+	return e.TrackedMod.Kind()
+}
+
+func NewModEnabler(game config.GameDef, tm TrackedMod, toInstall []*ToInstall, onConflict OnConflict, showWorking func(), doneCallback DoneCallback) *ModEnabler {
 	return &ModEnabler{
 		Game:         game,
 		TrackedMod:   tm,

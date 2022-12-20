@@ -7,7 +7,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/kiamev/moogle-mod-manager/mods"
 	cw "github.com/kiamev/moogle-mod-manager/ui/custom-widgets"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 )
 
 type alwaysDownloadDef struct {
@@ -16,7 +16,7 @@ type alwaysDownloadDef struct {
 	downloadFilesDef *downloadFilesDef
 }
 
-func newAlwaysDownloadDef(downloads *downloadsDef) *alwaysDownloadDef {
+func newAlwaysDownloadDef(downloads *downloads) *alwaysDownloadDef {
 	d := &alwaysDownloadDef{
 		entryManager:     newEntryManager(),
 		downloadFilesDef: newDownloadFilesDef(downloads),
@@ -54,7 +54,13 @@ func (d *alwaysDownloadDef) createItem(item interface{}, done ...func(interface{
 	dlf := item.(*mods.DownloadFiles)
 	d.downloadFilesDef.populate(dlf)
 
-	fd := dialog.NewForm("Edit Download Files", "Save", "Cancel", d.downloadFilesDef.getFormItems(),
+	fi, err := d.downloadFilesDef.getFormItems()
+	if err != nil {
+		dialog.ShowError(err, ui.Window)
+		return
+	}
+
+	fd := dialog.NewForm("Edit Download Files", "Save", "Cancel", fi,
 		func(ok bool) {
 			if ok {
 				result := d.downloadFilesDef.compile()
@@ -64,7 +70,7 @@ func (d *alwaysDownloadDef) createItem(item interface{}, done ...func(interface{
 				}
 				d.list.Refresh()
 			}
-		}, state.Window)
+		}, ui.Window)
 	fd.Resize(fyne.NewSize(400, 400))
 	fd.Show()
 }
@@ -79,10 +85,6 @@ func (d *alwaysDownloadDef) draw() fyne.CanvasObject {
 				})
 			})),
 		d.list.Draw())
-}
-
-func (d *alwaysDownloadDef) clear() {
-	d.list.Clear()
 }
 
 func (d *alwaysDownloadDef) set(alwaysDownload []*mods.DownloadFiles) {

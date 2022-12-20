@@ -2,6 +2,7 @@ package mod_author
 
 import (
 	"errors"
+	"fmt"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
@@ -12,6 +13,7 @@ import (
 	"github.com/kiamev/moogle-mod-manager/mods"
 	cw "github.com/kiamev/moogle-mod-manager/ui/custom-widgets"
 	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 	"github.com/kiamev/moogle-mod-manager/ui/util"
 	"strings"
 )
@@ -46,7 +48,7 @@ func (d *modCompatsDef) compile() []*mods.ModCompat {
 }
 
 func (d *modCompatsDef) getItemKey(item interface{}) string {
-	name, err := discover.GetDisplayName(*state.CurrentGame, item.(*mods.ModCompat).ModID())
+	name, err := discover.GetDisplayName(state.CurrentGame, item.(*mods.ModCompat).ModID())
 	if err != nil {
 		name = err.Error()
 	}
@@ -64,13 +66,14 @@ func (d *modCompatsDef) onEditItem(item interface{}) {
 func (d *modCompatsDef) createItem(item interface{}, done ...func(interface{})) {
 	var m = item.(*mods.ModCompat)
 
-	var game *config.Game
+	var (
+		game config.GameDef
+		err  error
+	)
 	if d.gd != nil && len(d.gd.list.Items) == 1 {
-		g := config.NameToGame(d.gd.compile()[0].Name)
-		game = &g
+		game, err = config.GameDefFromID(d.gd.compile()[0].ID)
 	}
-
-	if game == nil {
+	if err != nil {
 		util.ShowErrorLong(errors.New("please specify a supported Games first (from the Games tab)"))
 		return
 	}
@@ -89,9 +92,9 @@ func (d *modCompatsDef) createItem(item interface{}, done ...func(interface{})) 
 		}
 		s = strings.ToLower(s)
 		var results []string
-		for _, mod := range modLookup {
-			if strings.Contains(strings.ToLower(string(mod.ID)), s) || strings.Contains(strings.ToLower(mod.Name), s) {
-				results = append(results, mod.Name)
+		for _, mod := range modLookup.All() {
+			if strings.Contains(strings.ToLower(string(mod.ID())), s) || strings.Contains(strings.ToLower(string(mod.Name)), s) {
+				results = append(results, string(mod.Name))
 			}
 		}
 		search.SetOptions(results)
@@ -106,8 +109,8 @@ func (d *modCompatsDef) createItem(item interface{}, done ...func(interface{})) 
 			m.Hosted = nil
 			m.Nexus = nil
 			if search.Text != "" {
-				for _, mod := range modLookup {
-					if mod.Name == search.Text {
+				for _, mod := range modLookup.All() {
+					if mod.Name.Contains(search.Text) {
 						selected = mod
 						break
 					}
@@ -116,25 +119,31 @@ func (d *modCompatsDef) createItem(item interface{}, done ...func(interface{})) 
 					// TODO
 					return
 				}
-				if selected.ModKind.Kind == mods.Hosted {
+				switch selected.ModKind.Kind {
+				case mods.Hosted:
 					m.Kind = mods.Hosted
 					m.Hosted = &mods.ModCompatHosted{
-						ModID: selected.ID,
+						ModID: selected.ModID,
 					}
-				} else if selected.ModKind.Kind == mods.Nexus {
+				case mods.Nexus:
 					m.Kind = mods.Nexus
 					m.Nexus = &mods.ModCompatNexus{
-						ModID: selected.ID,
+						ModID: selected.ModID,
 					}
-				} else {
-					panic("unknown mod kind")
+				case mods.CurseForge:
+					m.Kind = mods.CurseForge
+					m.CurseForge = &mods.ModCompatCF{
+						ModID: selected.ModID,
+					}
+				default:
+					panic(fmt.Sprint("unknown mod kind: ", selected.ModKind.Kind))
 				}
 			}
 			if len(done) > 0 {
 				done[0](m)
 			}
 		}
-	}, state.Window)
+	}, ui.Window)
 	fd.Resize(fyne.NewSize(400, 400))
 	fd.Show()
 }

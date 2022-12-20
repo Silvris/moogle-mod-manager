@@ -7,7 +7,6 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
-	"github.com/kiamev/moogle-mod-manager/config"
 	"github.com/kiamev/moogle-mod-manager/discover"
 	"github.com/kiamev/moogle-mod-manager/mods"
 	"github.com/kiamev/moogle-mod-manager/mods/managed"
@@ -29,6 +28,7 @@ type discoverUI struct {
 	mods        []*mods.Mod
 	localMods   map[mods.ModID]bool
 	prevSearch  string
+	modList     *widget.List
 }
 
 func (ui *discoverUI) OnClose() {}
@@ -36,24 +36,26 @@ func (ui *discoverUI) OnClose() {}
 func (ui *discoverUI) PreDraw(w fyne.Window, args ...interface{}) (err error) {
 	var (
 		d      = dialog.NewInformation("", "Finding Mods...", w)
-		lookup map[string]*mods.Mod
+		lookup mods.ModLookup[*mods.Mod]
 		ok     bool
 	)
 	defer d.Hide()
 	d.Show()
 
+	ui.prevSearch = ""
+
 	ui.localMods = make(map[mods.ModID]bool)
-	for _, tm := range args[0].([]interface{})[0].([]*mods.TrackedMod) {
-		ui.localMods[tm.GetModID()] = true
+	for _, tm := range args[0].([]interface{})[0].([]mods.TrackedMod) {
+		ui.localMods[tm.ID()] = true
 	}
 
 	if lookup, err = discover.GetModsAsLookup(state.CurrentGame); err != nil {
 		return
 	}
 
-	ui.mods = make([]*mods.Mod, 0, len(lookup))
-	for _, m := range lookup {
-		if _, ok = ui.localMods[m.ID]; !ok {
+	ui.mods = make([]*mods.Mod, 0, lookup.Len())
+	for _, m := range lookup.All() {
+		if _, ok = ui.localMods[m.ID()]; !ok {
 			ui.mods = append(ui.mods, m)
 		}
 	}
@@ -72,7 +74,7 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 	if len(ui.mods) == 0 {
 		w.SetContent(container.NewBorder(
 			container.NewVBox(
-				widget.NewLabelWithStyle(config.GameNameString(*state.CurrentGame), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				widget.NewLabelWithStyle(string(state.CurrentGame.Name()), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				widget.NewSeparator(),
 			), nil, nil, nil, container.NewBorder(
 				container.NewAdaptiveGrid(8, container.NewHBox(widget.NewButton("Back", func() {
@@ -86,7 +88,7 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 		return
 	}
 	ui.data = binding.NewUntypedList()
-	modList := widget.NewListWithData(
+	ui.modList = widget.NewListWithData(
 		ui.data,
 		func() fyne.CanvasObject {
 			return widget.NewLabel("")
@@ -95,22 +97,22 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 			var m *mods.Mod
 			if i, ok := cw.GetValueFromDataItem(item); ok {
 				if m, ok = i.(*mods.Mod); ok {
-					co.(*widget.Label).SetText(m.Name)
+					co.(*widget.Label).SetText(string(m.Name))
 				}
 			}
 		})
 	if err := ui.showSorted(ui.mods); err != nil {
-		util.ShowErrorLong(err, w)
+		util.ShowErrorLong(err)
 		return
 	}
 
-	ui.split = container.NewHSplit(modList, container.NewMax())
+	ui.split = container.NewHSplit(ui.modList, container.NewMax())
 	ui.split.SetOffset(0.25)
 
-	modList.OnSelected = func(id widget.ListItemID) {
+	ui.modList.OnSelected = func(id widget.ListItemID) {
 		data, err := ui.data.GetItem(id)
 		if err != nil {
-			util.ShowErrorLong(err, w)
+			util.ShowErrorLong(err)
 			return
 		}
 		if i, ok := cw.GetValueFromDataItem(data); ok {
@@ -121,8 +123,8 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 		ui.split.Trailing = container.NewBorder(
 			container.NewHBox(widget.NewButton("Include Mod", func() {
 				mod := ui.selectedMod
-				if err := managed.AddMod(*state.CurrentGame, mods.NewTrackerMod(mod, *state.CurrentGame)); err != nil {
-					util.ShowErrorLong(err, w)
+				if err := managed.AddMod(state.CurrentGame, mods.NewTrackerMod(mod, state.CurrentGame)); err != nil {
+					util.ShowErrorLong(err)
 					return
 				}
 				for i, m := range ui.mods {
@@ -137,10 +139,11 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 					sl[i] = m
 				}
 				if err := ui.data.Set(sl); err != nil {
-					util.ShowErrorLong(err, w)
+					util.ShowErrorLong(err)
 					return
 				}
 				ui.selectedMod = nil
+				ui.modList.UnselectAll()
 				ui.split.Trailing = container.NewMax()
 				ui.split.Refresh()
 				state.UpdateCurrentScreen()
@@ -152,13 +155,13 @@ func (ui *discoverUI) draw(w fyne.Window, isPopup bool) {
 	searchTb := widget.NewEntry()
 	searchTb.OnChanged = func(s string) {
 		if err := ui.search(s); err != nil {
-			util.ShowErrorLong(err, w)
+			util.ShowErrorLong(err)
 		}
 	}
 
 	w.SetContent(container.NewBorder(
 		container.NewVBox(
-			widget.NewLabelWithStyle(config.GameNameString(*state.CurrentGame), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+			widget.NewLabelWithStyle(string(state.CurrentGame.Name()), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 			widget.NewSeparator(),
 		), nil, nil, nil, container.NewBorder(
 			container.NewHBox(
@@ -221,7 +224,7 @@ func (ui *discoverUI) applySearch(s string, orig []*mods.Mod) (result []*mods.Mo
 	ui.prevSearch = s
 
 	for _, m := range orig {
-		if strings.Contains(strings.ToLower(m.Name), s) ||
+		if strings.Contains(strings.ToLower(string(m.Name)), s) ||
 			strings.Contains(strings.ToLower(string(m.Category)), s) ||
 			strings.Contains(strings.ToLower(m.Description), s) ||
 			strings.Contains(strings.ToLower(m.Author), s) {

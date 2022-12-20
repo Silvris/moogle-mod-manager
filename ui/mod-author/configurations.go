@@ -7,7 +7,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/kiamev/moogle-mod-manager/mods"
 	cw "github.com/kiamev/moogle-mod-manager/ui/custom-widgets"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/ui/state/ui"
 )
 
 type configurationsDef struct {
@@ -17,7 +17,7 @@ type configurationsDef struct {
 	previewDef *previewDef
 }
 
-func newConfigurationsDef(dlDef *downloadsDef) *configurationsDef {
+func newConfigurationsDef(dlDef *downloads) *configurationsDef {
 	d := &configurationsDef{
 		entryManager: newEntryManager(),
 		previewDef:   newPreviewDef(),
@@ -87,7 +87,7 @@ func (d *configurationsDef) createItem(item interface{}, done ...func(interface{
 			}
 			d.list.Refresh()
 		}
-	}, state.Window)
+	}, ui.Window)
 	fd.Resize(fyne.NewSize(400, 400))
 	fd.Show()
 }
@@ -105,9 +105,7 @@ func (d *configurationsDef) draw() fyne.CanvasObject {
 
 func (d *configurationsDef) set(configurations []*mods.Configuration) {
 	d.list.Clear()
-	if configurations != nil {
-		for _, c := range configurations {
-			d.list.AddItem(c)
-		}
+	for _, c := range configurations {
+		d.list.AddItem(c)
 	}
 }

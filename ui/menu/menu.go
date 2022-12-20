@@ -55,7 +55,7 @@ func (m *MainMenu) Draw(w fyne.Window) {
 					"Update Available",
 					fmt.Sprintf("Version %s is available.\nWould you like to update?", newerVersion),
 					func(ok bool) {
-						browser.Update(newerVersion)
+						_ = browser.Update(newerVersion)
 					}, w)
 			} else {
 				dialog.ShowInformation("No Updates Available", "You are running the latest version.", w)
@@ -66,7 +66,7 @@ func (m *MainMenu) Draw(w fyne.Window) {
 			purl, _ := url.Parse("https://www.patreon.com/kiamev")
 			kurl, _ := url.Parse("https://ko-fi.com/kiamev")
 			dialog.ShowCustom("About", "ok", container.NewBorder(
-				widget.NewRichTextFromMarkdown(fmt.Sprintf(fmt.Sprintf(`
+				widget.NewRichTextFromMarkdown(fmt.Sprintf(`
 ## Moogle Mod Manager %s
 ____________________________
 Written by Kiame Vivacity
@@ -74,7 +74,7 @@ Written by Kiame Vivacity
 Contributors:
 
 - Silvris`,
-					browser.Version))), nil, nil, nil,
+					browser.Version)), nil, nil, nil,
 				container.NewVBox(
 					widget.NewLabel("If you'd like to support the project:"),
 					container.NewHBox(widget.NewLabel("- Patreon"), widget.NewHyperlink("https://www.patreon.com/kiamev", purl)),
@@ -84,16 +84,24 @@ Contributors:
 	menus = append(menus, file)
 
 	author := fyne.NewMenu("Author")
+	newMenu := fyne.NewMenuItem("New", nil)
+	newMenu.ChildMenu = fyne.NewMenu("",
+		fyne.NewMenuItem("Hosted Mod", func() {
+			state.GetScreen(state.ModAuthor).(*a.ModAuthorer).NewHostedMod()
+			state.ShowScreen(state.ModAuthor)
+		}),
+		fyne.NewMenuItem("From Nexus", func() {
+			state.GetScreen(state.ModAuthor).(*a.ModAuthorer).NewNexusMod()
+			state.ShowScreen(state.ModAuthor)
+		}),
+		fyne.NewMenuItem("From Curseforge", func() {
+			state.GetScreen(state.ModAuthor).(*a.ModAuthorer).NewCurseForgeMod()
+			state.ShowScreen(state.ModAuthor)
+		}),
+	)
 	if state.GetCurrentGUI() != state.ModAuthor {
 		author.Items = append(author.Items,
-			fyne.NewMenuItem("New Hosted Mod", func() {
-				state.GetScreen(state.ModAuthor).(*a.ModAuthorer).NewHostedMod()
-				state.ShowScreen(state.ModAuthor)
-			}),
-			fyne.NewMenuItem("New From Nexus", func() {
-				state.GetScreen(state.ModAuthor).(*a.ModAuthorer).NewNexusMod()
-				state.ShowScreen(state.ModAuthor)
-			}),
+			newMenu,
 			fyne.NewMenuItem("Edit Mod", func() {
 				if state.GetScreen(state.ModAuthor).(*a.ModAuthorer).LoadModToEdit() {
 					state.ShowScreen(state.ModAuthor)
@@ -102,8 +110,8 @@ Contributors:
 			fyne.NewMenuItem("Edit Current Mod", func() {
 				if state.GetCurrentGUI() == state.LocalMods {
 					if tm := state.GetScreen(state.LocalMods).(local.LocalUI).GetSelected(); tm != nil {
-						state.GetScreen(state.ModAuthor).(*a.ModAuthorer).EditMod(tm.Mod, func(mod *mods.Mod) {
-							tm.Mod = mod
+						state.GetScreen(state.ModAuthor).(*a.ModAuthorer).EditMod(tm.Mod(), func(mod *mods.Mod) {
+							tm.SetMod(mod)
 							if err := tm.Save(); err != nil {
 								util.ShowErrorLong(err)
 							}

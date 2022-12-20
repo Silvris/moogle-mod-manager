@@ -1,21 +1,19 @@
 package mod_author
 
 import (
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/kiamev/moogle-mod-manager/mods"
 )
 
 type downloadFilesDef struct {
 	*entryManager
-	downloads *downloadsDef
+	downloads *downloads
 	dlName    string
 	files     *filesDef
 	dirs      *dirsDef
 }
 
-func newDownloadFilesDef(downloads *downloadsDef) *downloadFilesDef {
+func newDownloadFilesDef(downloads *downloads) *downloadFilesDef {
 	return &downloadFilesDef{
 		entryManager: newEntryManager(),
 		downloads:    downloads,
@@ -32,9 +30,9 @@ func (d *downloadFilesDef) compile() *mods.DownloadFiles {
 	}
 }
 
-func (d *downloadFilesDef) draw() fyne.CanvasObject {
+/*func (d *downloadFilesDef) draw() fyne.CanvasObject {
 	var possible []string
-	for _, dl := range d.downloads.compile() {
+	for _, dl := range d.downloads.compileDownloads() {
 		possible = append(possible, dl.Name)
 	}
 
@@ -45,11 +43,17 @@ func (d *downloadFilesDef) draw() fyne.CanvasObject {
 		d.files.draw(true),
 		d.dirs.draw(true),
 	)
-}
+}*/
 
-func (d *downloadFilesDef) getFormItems() []*widget.FormItem {
-	var possible []string
-	for _, dl := range d.downloads.compile() {
+func (d *downloadFilesDef) getFormItems() ([]*widget.FormItem, error) {
+	var (
+		possible []string
+		dls, err = d.downloads.compileDownloads()
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, dl := range dls {
 		possible = append(possible, dl.Name)
 	}
 
@@ -59,7 +63,7 @@ func (d *downloadFilesDef) getFormItems() []*widget.FormItem {
 		d.getFormItem("Download Name"),
 		widget.NewFormItem("Files", d.files.draw(false)),
 		widget.NewFormItem("Dirs", d.dirs.draw(false)),
-	}
+	}, nil
 }
 
 func (d *downloadFilesDef) clear() {
@@ -78,7 +82,7 @@ func (d *downloadFilesDef) populate(dlf *mods.DownloadFiles) {
 	}
 }
 
-func (d *downloadFilesDef) set(df *mods.DownloadFiles) {
+/*func (d *downloadFilesDef) set(df *mods.DownloadFiles) {
 	d.dlName = ""
 	d.files.clear()
 	d.dirs.clear()
@@ -87,4 +91,4 @@ func (d *downloadFilesDef) set(df *mods.DownloadFiles) {
 		d.files.populate(df.Files)
 		d.dirs.populate(df.Dirs)
 	}
-}
+}*/

@@ -2,26 +2,30 @@ package mods
 
 import (
 	"fmt"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"github.com/kiamev/moogle-mod-manager/cache"
+	"github.com/kiamev/moogle-mod-manager/config"
+	"github.com/kiamev/moogle-mod-manager/ui/state"
+	"github.com/kiamev/moogle-mod-manager/util"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"github.com/kiamev/moogle-mod-manager/config"
-	"github.com/kiamev/moogle-mod-manager/mods/managed/cache"
-	"github.com/kiamev/moogle-mod-manager/ui/state"
-	"github.com/kiamev/moogle-mod-manager/util"
 )
 
 type(
 	SelectType string
 	Category   string
 	ModID      string
+	ModName    string
 )
+
+func (n ModName) Contains(text string) bool {
+	return strings.Contains(strings.ToLower(string(n)), strings.ToLower(text))
+}
 
 const (
 	Auto   SelectType = "Auto"
@@ -34,8 +38,10 @@ var SelectTypes = []string{string(Auto), string(Select), string(Radio)}
 const (
 	BattleScene        Category = "Battle Scene"
 	EnemySprite        Category = "Enemy Sprite"
-	GameOverhauls      Category = "Game Overhauls"
+	GameOverhauls      Category = "GameDef Overhauls"
 	Gameplay           Category = "Gameplay"
+	General            Category = "General"
+	Fonts              Category = "Fonts"
 	PlayerNpcSprites   Category = "Player/NPC Sprite"
 	ScriptText         Category = "Script/Text"
 	Soundtrack         Category = "Soundtrack"
@@ -62,46 +68,73 @@ var Categories = []string{
 	string(UiMenuPortraits),
 	string(UiWindowFrames),
 	string(UiTextBoxPortraits),
-	string(Utility)}
+	string(Utility),
+}
+
+type ModDef struct {
+	ModID               ModID               `json:"ID" xml:"ID"`
+	Name                ModName             `json:"Name" xml:"Name"`
+	Author              string              `json:"Author" xml:"Author"`
+	AuthorLink          string              `json:"AuthorLink" xml:"AuthorLink"`
+	ReleaseDate         string              `json:"ReleaseDate" xml:"ReleaseDate"`
+	Category            Category            `json:"Category" xml:"Category"`
+	Description         string              `json:"Description" xml:"Description"`
+	ReleaseNotes        string              `json:"ReleaseNotes" xml:"ReleaseNotes"`
+	Link                string              `json:"Link" xml:"Link"`
+	Version             string              `json:"Version" xml:"Version"`
+	InstallType_        *config.InstallType `json:"InstallType,omitempty" xml:"InstallType,omitempty"`
+	Preview             *Preview            `json:"Preview,omitempty" xml:"Preview,omitempty"`
+	ModKind             ModKind             `json:"ModKind" xml:"ModKind"`
+	ModCompatibility    *ModCompatibility   `json:"Compatibility,omitempty" xml:"ModCompatibility,omitempty"`
+	Downloadables       []*Download         `json:"Downloadable" xml:"Downloadables"`
+	DonationLinks       []*DonationLink     `json:"DonationLink" xml:"DonationLinks"`
+	Games               []*Game             `json:"Games" xml:"Games"`
+	AlwaysDownload      []*DownloadFiles    `json:"AlwaysDownload,omitempty" xml:"AlwaysDownload,omitempty"`
+	Configurations      []*Configuration    `json:"Configuration,omitempty" xml:"Configurations,omitempty"`
+	ConfigSelectionType SelectType          `json:"ConfigSelectionType" xml:"ConfigSelectionType"`
+	Hide                bool                `json:"Hide" xml:"Hide"`
+	IsManuallyCreated   bool                `json:"IsManuallyCreated" xml:"IsManuallyCreated"`
+}
+
+func NewMod(def *ModDef) *Mod {
+	return &Mod{ModDef: def}
+}
 
 type Mod struct {
-	ID                  ModID             `json:"ID" xml:"ID"`
-	Name                string            `json:"Name" xml:"Name"`
-	Author              string            `json:"Author" xml:"Author"`
-	AuthorLink          string            `json:"AuthorLink" xml:"AuthorLink"`
-	ReleaseDate         string            `json:"ReleaseDate" xml:"ReleaseDate"`
-	Category            Category          `json:"Category" xml:"Category"`
-	Description         string            `json:"Description" xml:"Description"`
-	ReleaseNotes        string            `json:"ReleaseNotes" xml:"ReleaseNotes"`
-	Link                string            `json:"Link" xml:"Link"`
-	Version             string            `json:"Version"`
-	Preview             *Preview          `json:"Preview,omitempty" xml:"Preview,omitempty"`
-	ModKind             ModKind           `json:"ModKind" xml:"ModKind"`
-	ModCompatibility    *ModCompatibility `json:"Compatibility,omitempty" xml:"ModCompatibility,omitempty"`
-	Downloadables       []*Download       `json:"Downloadable" xml:"Downloadables"`
-	DonationLinks       []*DonationLink   `json:"DonationLink" xml:"DonationLinks"`
-	Games               []*Game           `json:"Games" xml:"Games"`
-	AlwaysDownload      []*DownloadFiles  `json:"AlwaysDownload,omitempty" xml:"AlwaysDownload,omitempty"`
-	Configurations      []*Configuration  `json:"Configuration,omitempty" xml:"Configurations,omitempty"`
-	ConfigSelectionType SelectType        `json:"ConfigSelectionType" xml:"ConfigSelectionType"`
-	IsManuallyCreated   bool              `json:"IsManuallyCreated" xml:"IsManuallyCreated"`
+	*ModDef
 }
 
-func UniqueModID(game config.Game, modID ModID) string {
-	return fmt.Sprintf("%d.%s", game, modID)
+func (m *Mod) ID() ModID {
+	return m.ModID
 }
 
-func (m *Mod) UniqueModID(game config.Game) string {
-	return UniqueModID(game, NewModID(m.ModKind.Kind, string(m.ID)))
+func (m *Mod) Kind() Kind {
+	return m.ModKind.Kind
+}
+
+func (m *Mod) SubKind() SubKind {
+	return m.ModKind.SubKind.Get()
+}
+
+func (m *Mod) InstallType(game config.GameDef) config.InstallType {
+	i := game.DefaultInstallType()
+	if m.InstallType_ != nil {
+		i = *m.InstallType_
+	}
+	return i
 }
 
 func (m *Mod) ModIdAsNumber() (uint64, error) {
-	sp := strings.Split(string(m.ID), ".")
+	sp := strings.Split(string(m.ModID), ".")
 	return strconv.ParseUint(sp[len(sp)-1], 10, 64)
 }
 
 func (m *Mod) BranchName() string {
-	return fmt.Sprintf("%s_%s", m.ID, m.Version)
+	return fmt.Sprintf("%s_%s", m.ModID, m.Version)
+}
+
+func (m *Mod) Save(to string) error {
+	return util.SaveToFile(to, m.ModDef)
 }
 
 type Preview struct {
@@ -155,23 +188,11 @@ func (c *ModCompatibility) HasItems() bool {
 	return c != nil && (len(c.Requires) > 0 || len(c.Forbids) > 0)
 }
 
-type InstallType string
-
-const (
-	//Bundles  InstallType = "Bundles"
-	//Memoria  InstallType = "Memoria"
-	//Magicite InstallType = "Magicite"
-	//BepInEx  InstallType = "BepInEx"
-	// DLL Patcher https://discord.com/channels/371784427162042368/518331294858608650/863930606446182420
-	//DllPatch   InstallType = "DllPatch"
-	Compressed InstallType = "Compressed"
-)
-
-var InstallTypes = []string{ /*string(Bundles), string(Memoria), string(Magicite), string(BepInEx), /*string(DllPatch),*/ string(Compressed)}
+var InstallTypes = []string{string(config.Move), string(config.MoveToArchive)}
 
 type Game struct {
-	Name     config.GameName `json:"Name" xml:"Name"`
-	Versions []string        `json:"Version,omitempty" xml:"GameVersions,omitempty"`
+	ID       config.GameID    `json:"Name" xml:"Name"`
+	Versions []config.Version `json:"Version,omitempty" xml:"GameVersions,omitempty"`
 }
 
 type DownloadFiles struct {
@@ -201,7 +222,7 @@ type ModDir struct {
 type Configuration struct {
 	Name        string    `json:"Name" xml:"Name"`
 	Description string    `json:"Description" xml:"Description"`
-	Preview     *Preview  `json:"Preview,omitempty" xml:"Preview, omitempty"`
+	Preview     *Preview  `json:"Preview,omitempty" xml:"Preview,omitempty"`
 	Root        bool      `json:"Root" xml:"Root"`
 	Choices     []*Choice `json:"Choice" xml:"Choices"`
 
@@ -224,8 +245,8 @@ type DonationLink struct {
 
 func (m *Mod) Validate() string {
 	sb := strings.Builder{}
-	if m.ID == "" {
-		sb.WriteString("ID is required\n")
+	if m.ModID == "" {
+		sb.WriteString("ModID is required\n")
 	}
 	if m.Name == "" {
 		sb.WriteString("Name is required\n")
@@ -239,9 +260,9 @@ func (m *Mod) Validate() string {
 	if m.ReleaseDate == "" {
 		sb.WriteString("Release Date is required\n")
 	}
-	if m.Category == "" {
-		//	sb.WriteString("Category is required\n")
-	}
+	//if m.Category == "" {
+	//  sb.WriteString("Category is required\n")
+	//}
 	if m.Description == "" {
 		sb.WriteString("Description is required\n")
 	}
@@ -291,7 +312,7 @@ func (m *Mod) Validate() string {
 					dlableNames[s] = true
 				}
 			}
-		} else {
+		} else if kind == Nexus {
 			if d.Nexus == nil {
 				sb.WriteString(fmt.Sprintf("Downloadables [%s]'s Nexus is required\n", d.Name))
 			}
@@ -300,6 +321,17 @@ func (m *Mod) Validate() string {
 			}
 			if d.Nexus.FileName == "" {
 				sb.WriteString(fmt.Sprintf("Downloadables [%s]'s Nexus FileName is required\n", d.Name))
+			}
+			dlableNames[d.Name] = true
+		} else if kind == CurseForge {
+			if d.CurseForge == nil {
+				sb.WriteString(fmt.Sprintf("Downloadables [%s]'s CF is required\n", d.Name))
+			}
+			if d.CurseForge.FileID <= 0 {
+				sb.WriteString(fmt.Sprintf("Downloadables [%s]'s CF FileID must be greater than 0\n", d.Name))
+			}
+			if d.CurseForge.FileName == "" {
+				sb.WriteString(fmt.Sprintf("Downloadables [%s]'s CF FileName is required\n", d.Name))
 			}
 			dlableNames[d.Name] = true
 		}
@@ -326,9 +358,9 @@ func (m *Mod) Validate() string {
 		if c.Name == "" {
 			sb.WriteString("Configuration's Name is required\n")
 		}
-		if c.Description == "" {
-			//sb.WriteString(fmt.Sprintf("Configuration's [%s] Description is required\n", c.Name))
-		}
+		//if c.Description == "" {
+		//	sb.WriteString(fmt.Sprintf("Configuration's [%s] Description is required\n", c.Name))
+		//}
 		if len(c.Choices) == 0 {
 			sb.WriteString(fmt.Sprintf("Configuration's [%s] must have Choices\n", c.Name))
 		}
@@ -358,16 +390,15 @@ func (m *Mod) Validate() string {
 	return sb.String()
 }
 
-func (m *Mod) Supports(game config.Game) error {
-	name := config.GameToName(game)
+func (m *Mod) Supports(game config.GameDef) error {
 	if len(m.Games) > 0 {
 		for _, g := range m.Games {
-			if name == g.Name {
+			if game.ID() == g.ID {
 				return nil
 			}
 		}
 	}
-	return fmt.Errorf("%s does not support %s", m.Name, config.GameNameString(game))
+	return fmt.Errorf("%s does not support %s", m.Name, game.Name())
 }
 
 func (m *Mod) Merge(from Mod) {
@@ -383,7 +414,6 @@ func (m *Mod) Merge(from Mod) {
 		m.Description = from.Description
 		m.ReleaseNotes = from.ReleaseNotes
 	}
-	return
 }
 
 func NewModForVersion(manual *Mod, remote *Mod) *Mod {
@@ -398,8 +428,8 @@ func NewModForVersion(manual *Mod, remote *Mod) *Mod {
 	return &m
 }
 
-func (m *Mod) DirectoryName() string {
-	return util.CreateFileName(string(m.ID))
+func (m *Mod) Mod() *Mod {
+	return m
 }
 
 func Sort(mods []*Mod) (sorted []*Mod) {
@@ -411,7 +441,7 @@ func Sort(mods []*Mod) (sorted []*Mod) {
 		key    string
 	)
 	for i, m = range mods {
-		key = fmt.Sprintf("%s%s", m.Name, m.ID)
+		key = fmt.Sprintf("%s%s", m.Name, m.ModID)
 		lookup[key] = m
 		sl[i] = key
 	}

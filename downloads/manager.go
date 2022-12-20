@@ -3,83 +3,116 @@ package downloads
 import (
 	"fmt"
 	"github.com/kiamev/moogle-mod-manager/browser"
+	"github.com/kiamev/moogle-mod-manager/config"
 	"github.com/kiamev/moogle-mod-manager/mods"
-	"github.com/kiamev/moogle-mod-manager/ui/confirm"
 	"os"
 	"path/filepath"
 )
 
-func Download(enabler *mods.ModEnabler, done confirm.DownloadCompleteCallback) error {
-	if enabler.TrackedMod.Mod.ModKind.Kind == mods.Hosted {
-		confirm.Hosted(enabler, done, hosted)
-	} else {
-		if err := confirm.Nexus(enabler, done, nexus); err != nil {
-			return err
+func Download(game config.GameDef, mod mods.TrackedMod, toInstall []*mods.ToInstall) (err error) {
+	switch mod.Kind() {
+	case mods.CurseForge:
+		err = curseForge(game, mod, toInstall)
+	case mods.Nexus:
+		err = nexus(game, mod, toInstall)
+	case mods.Hosted:
+		err = hosted(game, mod, toInstall)
+	default:
+		return fmt.Errorf("unknown kind %v", mod.Kind())
+	}
+	return
+}
+
+func hosted(game config.GameDef, mod mods.TrackedMod, toInstall []*mods.ToInstall) error {
+	var (
+		f   string
+		err error
+	)
+	for _, ti := range toInstall {
+		if len(ti.Download.Hosted.Sources) == 0 {
+			return fmt.Errorf("%s has no download sources", ti.Download.Name)
+		}
+		for _, source := range ti.Download.Hosted.Sources {
+			if f, err = ti.GetDownloadLocation(game, mod); err != nil {
+				return err
+			}
+			if f, err = browser.Download(source, f); err == nil {
+				// success
+				ti.Download.DownloadedArchiveLocation = (*mods.ArchiveLocation)(&f)
+				break
+			}
+		}
+		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
+			return fmt.Errorf("failed to download %s", ti.Download.Hosted.Sources[0])
+		}
+	}
+
+	for _, ti := range toInstall {
+		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
+			return fmt.Errorf("failed to download %s", ti.Download.Hosted.Sources[0])
 		}
 	}
 	return nil
 }
 
-func hosted(enabler *mods.ModEnabler, done confirm.DownloadCompleteCallback, err error) {
-	var installed []*mods.InstalledDownload
-
-	for _, ti := range enabler.ToInstall {
-		if len(ti.Download.Hosted.Sources) == 0 {
-			err = fmt.Errorf("%s has no download sources", ti.Download.Name)
-			done(enabler, err)
-			return
-		}
-		for _, source := range ti.Download.Hosted.Sources {
-			var f string
-			if f, err = ti.GetDownloadLocation(enabler.Game, enabler.TrackedMod); err != nil {
-				done(enabler, err)
-				return
-			}
-			if f, err = browser.Download(source, f); err == nil {
-				// success
-				installed = append(installed, mods.NewInstalledDownload(ti.Download.Name, ti.Download.Version))
-				ti.Download.DownloadedArchiveLocation = &f
-				break
-			}
-		}
-	}
-
-	for _, ti := range enabler.ToInstall {
-		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
-			done(enabler, fmt.Errorf("failed to download %s", ti.Download.Hosted.Sources[0]))
-			return
-		}
-	}
-	done(enabler, nil)
-}
-
-func nexus(enabler *mods.ModEnabler, done confirm.DownloadCompleteCallback, err error) {
+func nexus(game config.GameDef, mod mods.TrackedMod, toInstall []*mods.ToInstall) error {
 	var (
 		dir  []os.DirEntry
 		path string
+		name string
+		err  error
 	)
-	for _, ti := range enabler.ToInstall {
-		if path, err = ti.GetDownloadLocation(enabler.Game, enabler.TrackedMod); err != nil {
-			done(enabler, err)
-			return
+	for _, ti := range toInstall {
+		if path, err = ti.GetDownloadLocation(game, mod); err != nil {
+			return err
 		}
 		if dir, err = os.ReadDir(path); err != nil {
-			done(enabler, err)
-			return
+			return err
+		}
+		if name, err = ti.Download.FileName(); err != nil {
+			return err
 		}
 
 		ti.Download.DownloadedArchiveLocation = nil
 		for _, f := range dir {
-			if ti.Download.Nexus.FileName == f.Name() {
+			if name == f.Name() {
 				s := filepath.Join(path, f.Name())
-				ti.Download.DownloadedArchiveLocation = &s
+				ti.Download.DownloadedArchiveLocation = (*mods.ArchiveLocation)(&s)
 				break
 			}
 		}
 		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
-			done(enabler, fmt.Errorf("failed to find %s in %s", ti.Download.Nexus.FileName, path))
-			return
+			return fmt.Errorf("failed to find %s in %s", name, path)
 		}
 	}
-	done(enabler, nil)
+	return nil
+}
+
+func curseForge(game config.GameDef, mod mods.TrackedMod, toInstall []*mods.ToInstall) error {
+	var (
+		f   string
+		err error
+	)
+	for _, ti := range toInstall {
+		for _, i := range toInstall {
+			if f, err = ti.GetDownloadLocation(game, mod); err != nil {
+				return err
+			}
+			if f, err = browser.Download(i.Download.CurseForge.Url, f); err == nil {
+				// success
+				ti.Download.DownloadedArchiveLocation = (*mods.ArchiveLocation)(&f)
+				break
+			}
+		}
+		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
+			return fmt.Errorf("failed to download %s", ti.Download.Hosted.Sources[0])
+		}
+	}
+
+	for _, ti := range toInstall {
+		if ti.Download.DownloadedArchiveLocation == nil || *ti.Download.DownloadedArchiveLocation == "" {
+			return fmt.Errorf("failed to download %s", ti.Download.Hosted.Sources[0])
+		}
+	}
+	return nil
 }
